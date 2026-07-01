@@ -1,3 +1,13 @@
+---
+title: It Job Finder Ai Cv
+emoji: 💼
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8002
+pinned: false
+---
+
 # IT Job Finder AI — CV Recommendation AI Service
 
 Microservice Python (FastAPI) chịu trách nhiệm **gợi ý CV phù hợp nhất với một JD (mô tả công việc)**:
