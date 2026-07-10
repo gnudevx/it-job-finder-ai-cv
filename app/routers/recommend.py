@@ -19,6 +19,7 @@ async def recommend(body: RecommendRequest):
         results = await rank_cvs(
             job_description=body.jobDescription,
             top_k=body.topK,
+            employer_id=body.employerId,
         )
         return RecommendResponse(
             success=True,

@@ -7,6 +7,7 @@ from typing import Optional
 class RecommendRequest(BaseModel):
     jobDescription: str = Field(..., min_length=20, description="Nội dung JD / yêu cầu tuyển dụng")
     topK: int = Field(default=5, ge=1, le=20, description="Số CV trả về")
+    employerId: Optional[str] = Field(default=None, description="ID nhà tuyển dụng để chỉ xét các ứng viên đã apply vào các job của họ")
 
 
 # ── Internal ─────────────────────────────────────────────────────────────────

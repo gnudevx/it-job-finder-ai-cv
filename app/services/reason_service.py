@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
 
 _PROMPT_TEMPLATE = """
-Bạn là chuyên gia tuyển dụng. Viết ĐÚNG 2 câu tiếng Việt nhận xét ứng viên.
+Bạn là chuyên gia tuyển dụng. Viết ĐÚNG 5 câu tiếng Việt nhận xét ứng viên.
 
 YÊU CẦU TUYỂN DỤNG: {job_description}
 
@@ -89,8 +89,9 @@ def _generate_sync(prompt: str) -> str:
         model="gemini-2.5-flash",
         contents=prompt,
         config={
-            "max_output_tokens": 300,
+            "max_output_tokens": 1024,
             "temperature": 0.4,
+            "thinking_config": {"thinking_budget": 0},
         },
     )
     return (response.text or "").strip()

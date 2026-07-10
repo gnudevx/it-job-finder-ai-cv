@@ -12,7 +12,7 @@ Orchestrate toàn bộ pipeline:
 import logging
 from bson import ObjectId
 
-from app.db.mongo import get_parsed_resumes_col, get_resumes_col
+from app.db.mongo import get_applications_col, get_jobs_col, get_parsed_resumes_col, get_resumes_col
 from app.services.embedding_service import embed_query, embed_batch_documents
 from app.services.similarity_service import batch_cosine_similarity, to_percentage
 from app.services.reason_service import generate_reasons_batch
@@ -21,11 +21,55 @@ from app.models.schemas import RankedCV
 logger = logging.getLogger(__name__)
 
 
-async def _load_parsed_resumes() -> list[dict]:
-    """Load tất cả ParsedResume có summary."""
+async def _load_target_parsed_resumes(employer_id: ObjectId | None = None) -> list[dict]:
+    """Load ParsedResume cho các ứng viên đã apply vào các job thuộc employer; nếu không có employer thì dùng toàn bộ."""
     col = get_parsed_resumes_col()
+
+    if employer_id is None:
+        cursor = col.find(
+            {"shortSummary": {"$exists": True, "$ne": ""}},
+            {
+                "resumeId": 1,
+                "candidateId": 1,
+                "skills": 1,
+                "totalYearsExperience": 1,
+                "detectedRole": 1,
+                "summary": 1,
+                "shortSummary": 1,
+            },
+        )
+        return await cursor.to_list(length=None)
+
+    jobs_col = get_jobs_col()
+    jobs_cursor = jobs_col.find(
+        {"employer_id": employer_id},
+        {"_id": 1},
+    )
+    jobs = await jobs_cursor.to_list(length=None) 
+    job_ids = [
+        job["_id"]
+        for job in jobs
+        if "_id" in job
+    ]
+    if not job_ids:
+        return []
+
+    applications_col = get_applications_col()
+    applications_cursor = applications_col.find(
+        {"jobId": {"$in": job_ids}},
+        {"resumeId": 1, "_id": 0},
+    )
+    applications = await applications_cursor.to_list(length=None) 
+
+    resume_ids = [app.get("resumeId") for app in applications if app.get("resumeId")]
+    if not resume_ids:
+        return []
+
     cursor = col.find(
-        {"shortSummary": {"$exists": True, "$ne": ""}},
+        {
+            "resumeId": {"$in": resume_ids},
+            "shortSummary": {"$exists": True, "$ne": ""},
+        },
         {
             "resumeId": 1,
             "candidateId": 1,
@@ -58,14 +102,21 @@ async def _cache_embedding(resume_id: ObjectId, embedding: list[float]):
     )
 
 
-async def rank_cvs(job_description: str, top_k: int = 5) -> list[RankedCV]:
+async def rank_cvs(job_description: str, top_k: int = 5, employer_id: str | None = None) -> list[RankedCV]:
     # ── 1. Embed JD ──────────────────────────────────────────────────────────
     jd_vec = await embed_query(job_description)
 
-    # ── 2. Load parsed resumes ───────────────────────────────────────────────
-    parsed_list = await _load_parsed_resumes()
+    # ── 2. Load parsed resumes cho đúng scope employer / applications ─────
+    target_employer_id = None
+    if employer_id:
+        try:
+            target_employer_id = ObjectId(str(employer_id))
+        except Exception:
+            logger.warning("Invalid employerId %s, falling back to all parsed resumes", employer_id)
+
+    parsed_list = await _load_target_parsed_resumes(employer_id=target_employer_id)
     if not parsed_list:
-        logger.warning("No parsed resumes found in DB")
+        logger.warning("No parsed resumes found for target employer or database")
         return []
 
     # ── 3. Lấy embedding — cache nếu chưa có ─────────────────────────────────
