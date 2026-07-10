@@ -16,6 +16,9 @@ class RankedCV(BaseModel):
     resumeId: str
     candidateId: Optional[str] = None
     fullName: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
     title: Optional[str] = None          # detectedRole
     skills: list[str] = []
     experienceYears: Optional[float] = None

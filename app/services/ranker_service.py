@@ -12,7 +12,7 @@ Orchestrate toàn bộ pipeline:
 import logging
 from bson import ObjectId
 
-from app.db.mongo import get_applications_col, get_jobs_col, get_parsed_resumes_col, get_resumes_col
+from app.db.mongo import get_applications_col, get_db, get_jobs_col, get_parsed_resumes_col, get_resumes_col
 from app.services.embedding_service import embed_query, embed_batch_documents
 from app.services.similarity_service import batch_cosine_similarity, to_percentage
 from app.services.reason_service import generate_reasons_batch
@@ -88,7 +88,20 @@ async def _get_resume_meta(resume_id: ObjectId) -> dict:
     col = get_resumes_col()
     doc = await col.find_one(
         {"_id": resume_id},
-        {"fileUrl": 1, "fileName": 1, "fileType": 1, "embedding": 1, "skills": 1},
+        {"fileUrl": 1, "fileName": 1, "fileType": 1, "embedding": 1, "skills": 1, "candidateId": 1},
+    )
+    return doc or {}
+
+
+async def _get_candidate_profile(candidate_id: ObjectId | None) -> dict:
+    """Load thông tin ứng viên từ collection CANDIDATES nếu có."""
+    if not candidate_id:
+        return {}
+
+    candidate_col = get_db()["CANDIDATES"]
+    doc = await candidate_col.find_one(
+        {"_id": candidate_id},
+        {"fullName": 1, "email": 1, "phone": 1, "address": 1, "avatar": 1},
     )
     return doc or {}
 
@@ -190,11 +203,17 @@ async def rank_cvs(job_description: str, top_k: int = 5, employer_id: str | None
     for pr, score, reason in zip(top_candidates, top_scores, reasons):
         resume_id = pr.get("resumeId")
         meta = resume_metas.get(str(resume_id), {})
+        candidate_id = meta.get("candidateId")
+        candidate_profile = await _get_candidate_profile(candidate_id)
 
         results.append(
             RankedCV(
                 resumeId=str(resume_id),
-                candidateId=str(pr.get("candidateId", "")),
+                candidateId=str(candidate_id or pr.get("candidateId", "")),
+                fullName=candidate_profile.get("fullName"),
+                email=candidate_profile.get("email"),
+                phone=candidate_profile.get("phone"),
+                address=candidate_profile.get("address"),
                 title=pr.get("detectedRole", ""),
                 skills=pr.get("skills", []),
                 experienceYears=pr.get("totalYearsExperience", 0),
@@ -202,6 +221,7 @@ async def rank_cvs(job_description: str, top_k: int = 5, employer_id: str | None
                 shortSummary=pr.get("shortSummary", ""),
                 matchScore=to_percentage(score),
                 matchReason=reason,
+                avatar=candidate_profile.get("avatar"),
                 fileType=meta.get("fileType", "pdf"),
                 fileName=meta.get("fileName", ""),
             )
