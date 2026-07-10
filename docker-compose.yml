@@ -1,0 +1,24 @@
+version: '3.9'
+
+services:
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./app:/app/app
+    networks:
+      - app-network
+networks:
+  app-network:
+    # Nếu Node.js backend chạy Docker cùng network → đổi thành external: true
+    # và dùng tên network của backend project
+    driver: bridge
