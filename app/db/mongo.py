@@ -38,6 +38,14 @@ def get_parsed_resumes_col():
     return get_db()["PARSED_RESUMES"]
 
 
+def get_applications_col():
+    return get_db()["APPLICATIONS"]
+
+
+def get_jobs_col():
+    return get_db()["jobs"]
+
+
 async def close_client():
     global _client
     if _client:
