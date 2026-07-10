@@ -93,14 +93,22 @@ async def _get_resume_meta(resume_id: ObjectId) -> dict:
     return doc or {}
 
 
-async def _get_candidate_profile(candidate_id: ObjectId | None) -> dict:
+async def _get_candidate_profile(candidate_id: ObjectId | str | None) -> dict:
     """Load thông tin ứng viên từ collection CANDIDATES nếu có."""
     if not candidate_id:
         return {}
 
+    try:
+        resolved_candidate_id = ObjectId(str(candidate_id))
+    except Exception:
+        resolved_candidate_id = None
+
+    if not resolved_candidate_id:
+        return {}
+
     candidate_col = get_db()["CANDIDATES"]
     doc = await candidate_col.find_one(
-        {"_id": candidate_id},
+        {"_id": resolved_candidate_id},
         {"fullName": 1, "email": 1, "phone": 1, "address": 1, "avatar": 1},
     )
     return doc or {}
